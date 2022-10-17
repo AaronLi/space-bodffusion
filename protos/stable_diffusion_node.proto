@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package space_bodffusion;
+
+service StableDiffusionNode {
+  // client connects to server and receives requests from server for processing
+  rpc GetTask(GetTaskRequest) returns (StableDiffusionRequest) {}
+  rpc PostResult(StableDiffusionResponse) returns (PostResultResponse) {}
+}
+
+message GetTaskRequest{}
+message PostResultResponse{}
+
+message StableDiffusionRequest {
+  string prompt = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+  uint32 num_inference_steps = 4;
+  float guidance_scale = 5;
+  optional string negative_prompt = 6;
+  uint32 num_images_per_prompt = 7;
+  bytes request_id = 8;
+  string requester = 9;
+}
+
+message StableDiffusionResponse {
+  bytes request_id = 1;
+  repeated bytes images = 2;
+  string prompt = 3;
+  float cost = 4;
+  optional bool out_of_memory = 5;
+}
