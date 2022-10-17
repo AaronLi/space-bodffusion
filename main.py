@@ -1,6 +1,7 @@
 import asyncio
 import io
 import os
+import sys
 import uuid
 from typing import Dict, Tuple
 
@@ -93,7 +94,9 @@ if __name__ == '__main__':
     server.add_insecure_port('[::]:50051')
 
     bot_token = os.getenv('DISCORD_BOT_TOKEN')
-
+    if bot_token is None:
+        print('No bot token specified (specify using DISCORD_BOT_TOKEN environment variable)')
+        sys.exit(1)
     loop = asyncio.get_event_loop()
     loop.create_task(server.start(), name='grpc_server')
     loop.create_task(discord_bot.start(token=bot_token), name='discord_bot')

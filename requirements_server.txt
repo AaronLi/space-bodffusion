@@ -1,0 +1,3 @@
+grpcio~=1.49.1
+py-cord~=2.2.2
+protobuf~=4.21.7
