@@ -1,17 +1,34 @@
+import argparse
+import random
+import time
 import uuid
 from io import BytesIO
 
-import torch
-from torch import autocast
-from diffusers import StableDiffusionPipeline
 import grpc
+import torch
+from diffusers import StableDiffusionPipeline
+from torch import autocast
 from wakepy import keepawake
 
 import stable_diffusion_node_pb2
 from stable_diffusion_node_pb2_grpc import StableDiffusionNodeStub
 
+
+def get_task(retries = 10) -> stable_diffusion_node_pb2.StableDiffusionRequest:
+    for i in range(retries):
+        try:
+            return stub.GetTask(stable_diffusion_node_pb2.GetTaskRequest())
+        except grpc.RpcError as e:
+            print('failed to get task: ', e)
+        except Exception as e:
+            print('unknown error', e)
+        time.sleep(random.random() * 2**i)
+
 if __name__ == '__main__':
-    channel = grpc.insecure_channel('localhost:50051')
+    parser = argparse.ArgumentParser(description='Space Bodffusion processing node')
+    parser.add_argument('server', type=str, help='server address')
+    args = parser.parse_args()
+    channel = grpc.insecure_channel(args.server)
     stub = StableDiffusionNodeStub(channel)
 
     model_id = "CompVis/stable-diffusion-v1-4"
@@ -21,10 +38,11 @@ if __name__ == '__main__':
     print('ready')
     with keepawake():
         while True:
-            request = stub.GetTask(stable_diffusion_node_pb2.GetTaskRequest())
+            request = get_task()
+            if request is None:
+                continue
             if not request.valid:
                 continue
-            print(f'received request: {request}')
             prompt = request.prompt
             width = request.width or 512
             height = request.height or 512
@@ -33,6 +51,7 @@ if __name__ == '__main__':
             num_images_per_prompt = request.num_images_per_prompt or 1
             guidance_scale = request.guidance_scale or 7.5
             request_id = request.request_id
+            print(f'received request:')
             print(
                 f'''Executing
             prompt: {prompt},
