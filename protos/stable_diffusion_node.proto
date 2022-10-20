@@ -21,6 +21,7 @@ message StableDiffusionRequest {
   uint32 num_images_per_prompt = 7;
   bytes request_id = 8;
   string requester = 9;
+  bool valid = 10;
 }
 
 message StableDiffusionResponse {
