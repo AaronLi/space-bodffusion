@@ -17,17 +17,20 @@ from stable_diffusion_node_pb2_grpc import StableDiffusionNodeServicer
 
 CommandQueueEntry = namedtuple('CommandQueueEntry', ('request', 'initial_response_message', 'channel', 'user'))
 
+
 class StableDiffusionNodeServer(StableDiffusionNodeServicer):
-    async def UpdateProgress(self, request, context):
-        progress_percentage = request.current_step/request.num_steps
+    async def UpdateProgress(self, requests, context):
+        async for request in requests:
+            progress_percentage = request.current_step / request.num_steps
 
-        task = self.task_data[request.request_id]
+            task = self.task_data[request.request_id]
 
-        default_text = get_base_response_message(task.user.display_name, task.request.num_images_per_prompt,
-                                                 task.request.prompt, task.request.width, task.request.height)
-        green_boxes = math.ceil(20*progress_percentage)
-        progress_bar = f"{green_boxes*'🟩'}{(20 - green_boxes) * '🟥'}"
-        await task.initial_response_message.edit_original_response(content=default_text+f"\nIn progress: {progress_bar} {int(100*progress_percentage)}%")
+            default_text = get_base_response_message(task.user.display_name, task.request.num_images_per_prompt,
+                                                     task.request.prompt, task.request.width, task.request.height)
+            green_boxes = math.ceil(20 * progress_percentage)
+            progress_bar = f"{green_boxes * '🟩'}{(20 - green_boxes) * '🟥'}"
+            await task.initial_response_message.edit_original_response(
+                content=default_text + f"\nIn progress: {progress_bar} {int(100 * progress_percentage)}%")
 
         return stable_diffusion_node_pb2.UpdateProgressResponse()
 
@@ -44,19 +47,22 @@ class StableDiffusionNodeServer(StableDiffusionNodeServicer):
             # get and remove old task data
             task_info = self.task_data.pop(task.request_id)
 
-            #generate new request_id
+            # generate new request_id
             task_info.request.request_id = uuid.uuid4().bytes
 
             # put old task data into new entry
             self.task_data[task_info.request.request_id] = task_info
 
-            default_text = get_base_response_message(task_info.user.display_name, task_info.request.num_images_per_prompt,
-                                                     task_info.request.prompt, task_info.request.width, task_info.request.height)
+            default_text = get_base_response_message(task_info.user.display_name,
+                                                     task_info.request.num_images_per_prompt,
+                                                     task_info.request.prompt, task_info.request.width,
+                                                     task_info.request.height)
 
             # update message to say timed out
             # requeue task
             await asyncio.gather(
-                self.task_data[task_info.request.request_id].initial_response_message.edit_original_response(content=default_text+"\nTimed Out.\nPrompt will be retried"),
+                self.task_data[task_info.request.request_id].initial_response_message.edit_original_response(
+                    content=default_text + "\nTimed Out.\nPrompt will be retried"),
                 self.request_queue.put(task_info)
             )
 
@@ -75,9 +81,11 @@ class StableDiffusionNodeServer(StableDiffusionNodeServicer):
             # create timeout and put in timeouts dict
             self.add_timeout(task.request)
 
-            default_text = get_base_response_message(task.user.display_name, task.request.num_images_per_prompt, task.request.prompt, task.request.width, task.request.height)
+            default_text = get_base_response_message(task.user.display_name, task.request.num_images_per_prompt,
+                                                     task.request.prompt, task.request.width, task.request.height)
             # notify progress started
-            await task.initial_response_message.edit_original_response(content=default_text+"\nWorker started working on task...")
+            await task.initial_response_message.edit_original_response(
+                content=default_text + "\nWorker started working on task...")
 
             self.add_task_data(task)
             return task.request
@@ -89,8 +97,10 @@ class StableDiffusionNodeServer(StableDiffusionNodeServicer):
         try:
             request_info = self.task_data.pop(request.request_id)
 
-            default_text = get_base_response_message(request_info.user.display_name, request_info.request.num_images_per_prompt,
-                                                     request_info.request.prompt, request_info.request.width, request_info.request.height)
+            default_text = get_base_response_message(request_info.user.display_name,
+                                                     request_info.request.num_images_per_prompt,
+                                                     request_info.request.prompt, request_info.request.width,
+                                                     request_info.request.height)
             # request didn't time out, cancel timeout watcher
             del self.timeouts[request.request_id]
             if request.out_of_memory:
@@ -99,8 +109,9 @@ class StableDiffusionNodeServer(StableDiffusionNodeServicer):
                 )
             else:
                 await request_info.initial_response_message.edit_original_response(
-                    content=default_text+f'\nFinished request for {request_info.user.mention}\n**{request.prompt}**',
-                    files=[discord.File(io.BytesIO(image), filename=f'{i}.jpg') for i, image in enumerate(request.images)]
+                    content=default_text + f'\nFinished request for {request_info.user.mention}\n**{request.prompt}**',
+                    files=[discord.File(io.BytesIO(image), filename=f'{i}.jpg') for i, image in
+                           enumerate(request.images)]
                 )
         except KeyError:
             # key does not exist in data store, message came from timed out request
@@ -116,9 +127,11 @@ class StableDiffusionNodeServer(StableDiffusionNodeServicer):
 def get_base_response_message(display_name, num_images, prompt, width, height) -> str:
     return f'{display_name} submitted prompt for {num_images}x\"{utils.escape_markdown(prompt)}\" with resolution {width}x{height}'
 
+
 if __name__ == '__main__':
     discord_bot = discord.Bot()
     command_queue = asyncio.Queue(maxsize=128)
+
 
     @discord_bot.slash_command()
     async def stable_diffusion(
@@ -159,21 +172,23 @@ if __name__ == '__main__':
         await command_queue.put(
             CommandQueueEntry(
                 request=stable_diffusion_node_pb2.StableDiffusionRequest(
-            prompt=prompt,
-            request_id=request_uuid,
-            num_images_per_prompt=num_images,
-            width=width,
-            height=height,
-            valid=True
+                    prompt=prompt,
+                    request_id=request_uuid,
+                    num_images_per_prompt=num_images,
+                    width=width,
+                    height=height,
+                    valid=True
                 ),
-                initial_response_message = initial_message,
+                initial_response_message=initial_message,
                 channel=ctx.channel,
                 user=ctx.user
             )
         )
 
+
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
-    stable_diffusion_node_pb2_grpc.add_StableDiffusionNodeServicer_to_server(StableDiffusionNodeServer(command_queue), server)
+    stable_diffusion_node_pb2_grpc.add_StableDiffusionNodeServicer_to_server(StableDiffusionNodeServer(command_queue),
+                                                                             server)
 
     server.add_insecure_port('0.0.0.0:50051')
 

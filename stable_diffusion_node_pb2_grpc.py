@@ -24,7 +24,7 @@ class StableDiffusionNodeStub(object):
                 request_serializer=stable__diffusion__node__pb2.StableDiffusionResponse.SerializeToString,
                 response_deserializer=stable__diffusion__node__pb2.PostResultResponse.FromString,
                 )
-        self.UpdateProgress = channel.unary_unary(
+        self.UpdateProgress = channel.stream_unary(
                 '/space_bodffusion.StableDiffusionNode/UpdateProgress',
                 request_serializer=stable__diffusion__node__pb2.UpdateProgressMessage.SerializeToString,
                 response_deserializer=stable__diffusion__node__pb2.UpdateProgressResponse.FromString,
@@ -47,7 +47,7 @@ class StableDiffusionNodeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def UpdateProgress(self, request, context):
+    def UpdateProgress(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -66,7 +66,7 @@ def add_StableDiffusionNodeServicer_to_server(servicer, server):
                     request_deserializer=stable__diffusion__node__pb2.StableDiffusionResponse.FromString,
                     response_serializer=stable__diffusion__node__pb2.PostResultResponse.SerializeToString,
             ),
-            'UpdateProgress': grpc.unary_unary_rpc_method_handler(
+            'UpdateProgress': grpc.stream_unary_rpc_method_handler(
                     servicer.UpdateProgress,
                     request_deserializer=stable__diffusion__node__pb2.UpdateProgressMessage.FromString,
                     response_serializer=stable__diffusion__node__pb2.UpdateProgressResponse.SerializeToString,
@@ -116,7 +116,7 @@ class StableDiffusionNode(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def UpdateProgress(request,
+    def UpdateProgress(request_iterator,
             target,
             options=(),
             channel_credentials=None,
@@ -126,7 +126,7 @@ class StableDiffusionNode(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/space_bodffusion.StableDiffusionNode/UpdateProgress',
+        return grpc.experimental.stream_unary(request_iterator, target, '/space_bodffusion.StableDiffusionNode/UpdateProgress',
             stable__diffusion__node__pb2.UpdateProgressMessage.SerializeToString,
             stable__diffusion__node__pb2.UpdateProgressResponse.FromString,
             options, channel_credentials,

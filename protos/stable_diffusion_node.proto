@@ -6,7 +6,7 @@ service StableDiffusionNode {
   // client connects to server and receives requests from server for processing
   rpc GetTask(GetTaskRequest) returns (StableDiffusionRequest) {}
   rpc PostResult(StableDiffusionResponse) returns (PostResultResponse) {}
-  rpc UpdateProgress(UpdateProgressMessage) returns (UpdateProgressResponse) {}
+  rpc UpdateProgress(stream UpdateProgressMessage) returns (UpdateProgressResponse) {}
 }
 
 message GetTaskRequest{}

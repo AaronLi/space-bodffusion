@@ -79,20 +79,18 @@ if __name__ == '__main__':
                         updates_queue.put(stable_diffusion_node_pb2.UpdateProgressMessage(request_id=request_id, current_step = step, num_steps=total_steps))
 
                     def send_update():
-                        while updates_queue:
-                            result = updates_queue.get(True)
-                            if result is None:
+                        while True:
+                            val = updates_queue.get(True)
+                            if val is None:
                                 break
-                            stub.UpdateProgress(result)
+                            yield val
 
-                    updates_thread = threading.Thread(target=send_update, daemon=True)
-                    updates_thread.start()
-
-                    result = pipe(prompt, guidance_scale=guidance_scale, width=width, height=height, num_inference_steps=total_steps, negative_prompt=negative_prompt, num_images_per_prompt=num_images_per_prompt, callback=updates_callback)
+                    update_thread = threading.Thread(target=lambda: stub.UpdateProgress(send_update()))
+                    update_thread.start()
+                    result = pipe(prompt, guidance_scale=guidance_scale, width=width, height=height, num_inference_steps=total_steps, negative_prompt=negative_prompt, num_images_per_prompt=num_images_per_prompt, callback=updates_callback, callback_steps=total_steps//10)
                     updates_queue.put(None)
-                    updates_thread.join()
+                    update_thread.join()
                 except RuntimeError:
-                    print(request_id, prompt)
                     stub.PostResult(stable_diffusion_node_pb2.StableDiffusionResponse(request_id= request_id, images = [], prompt=prompt, out_of_memory = True))
                     continue
             images = result[0]
