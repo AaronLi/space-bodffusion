@@ -1,4 +1,4 @@
-FROM python:alpine3.16
+FROM python:3.9.15-alpine3.16
 
 RUN mkdir /discord_bot
 WORKDIR /discord_bot
