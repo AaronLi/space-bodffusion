@@ -3,3 +3,4 @@ diffusers~=0.5.1
 grpcio~=1.49.1
 protobuf~=4.21.7
 wakepy~=0.5.0
+pypresence~=4.2.1

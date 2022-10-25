@@ -1,10 +1,14 @@
 import argparse
+import functools
+import queue
 import random
 import time
 import uuid
+import threading
 from io import BytesIO
 
 import grpc
+import pypresence
 import torch
 from diffusers import StableDiffusionPipeline
 from torch import autocast
@@ -35,9 +39,14 @@ if __name__ == '__main__':
     device='cuda'
 
     pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16, revision='fp16', use_auth_token=True).to(device)
+
+    presence = pypresence.Presence('942678157281079358')
+    presence.connect()
+    start_time = int(time.time())
     print('ready')
     with keepawake():
         while True:
+            presence.update(start=start_time)
             request = get_task()
             if request is None:
                 continue
@@ -46,7 +55,7 @@ if __name__ == '__main__':
             prompt = request.prompt
             width = request.width or 512
             height = request.height or 512
-            num_inference_steps = request.num_inference_steps or 20
+            total_steps = request.num_inference_steps or 20
             negative_prompt = request.negative_prompt
             num_images_per_prompt = request.num_images_per_prompt or 1
             guidance_scale = request.guidance_scale or 7.5
@@ -57,7 +66,7 @@ if __name__ == '__main__':
             prompt: {prompt},
             width: {width},
             height: {height},
-            num_inference_steps: {num_inference_steps},
+            num_inference_steps: {total_steps},
             neg_prompt: {negative_prompt},
             num_images_per_prompt: {num_images_per_prompt},
             guidance_scale: {guidance_scale},
@@ -65,7 +74,23 @@ if __name__ == '__main__':
             ''')
             with autocast(device, dtype=torch.bfloat16):
                 try:
-                    result = pipe(prompt, guidance_scale=guidance_scale, width=width, height=height, num_inference_steps=num_inference_steps, negative_prompt=negative_prompt, num_images_per_prompt=num_images_per_prompt)
+                    updates_queue = queue.Queue()
+                    def updates_callback(step: int, timestep: int, latents: torch.FloatTensor):
+                        updates_queue.put(stable_diffusion_node_pb2.UpdateProgressMessage(request_id=request_id, current_step = step, num_steps=total_steps))
+
+                    def send_update():
+                        while updates_queue:
+                            result = updates_queue.get(True)
+                            if result is None:
+                                break
+                            stub.UpdateProgress(result)
+
+                    updates_thread = threading.Thread(target=send_update, daemon=True)
+                    updates_thread.start()
+
+                    result = pipe(prompt, guidance_scale=guidance_scale, width=width, height=height, num_inference_steps=total_steps, negative_prompt=negative_prompt, num_images_per_prompt=num_images_per_prompt, callback=updates_callback)
+                    updates_queue.put(None)
+                    updates_thread.join()
                 except RuntimeError:
                     print(request_id, prompt)
                     stub.PostResult(stable_diffusion_node_pb2.StableDiffusionResponse(request_id= request_id, images = [], prompt=prompt, out_of_memory = True))

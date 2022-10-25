@@ -6,10 +6,12 @@ service StableDiffusionNode {
   // client connects to server and receives requests from server for processing
   rpc GetTask(GetTaskRequest) returns (StableDiffusionRequest) {}
   rpc PostResult(StableDiffusionResponse) returns (PostResultResponse) {}
+  rpc UpdateProgress(UpdateProgressMessage) returns (UpdateProgressResponse) {}
 }
 
 message GetTaskRequest{}
 message PostResultResponse{}
+message UpdateProgressResponse{}
 
 message StableDiffusionRequest {
   string prompt = 1;
@@ -30,4 +32,10 @@ message StableDiffusionResponse {
   string prompt = 3;
   float cost = 4;
   optional bool out_of_memory = 5;
+}
+
+message UpdateProgressMessage {
+  bytes request_id = 1;
+  uint32 current_step = 2;
+  uint32 num_steps = 3;
 }
